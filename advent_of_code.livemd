@@ -1,0 +1,186 @@
+# Advent of Code 2023
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.11.3"},
+  {:kino_aoc, "~> 0.1.5"}
+])
+
+require Logger
+```
+
+## Day 1: Trebuchet?!
+
+### Part 1
+
+Something is wrong with global snow production, and you've been selected to take a look. The Elves have even given you a map; on it, they've used stars to mark the top fifty locations that are likely to be having problems.
+
+You've been doing this long enough to know that to restore snow operations, you need to check all fifty stars by December 25th.
+
+Collect stars by solving puzzles. Two puzzles will be made available on each day in the Advent calendar; the second puzzle is unlocked when you complete the first. Each puzzle grants one star. Good luck!
+
+You try to ask why they can't just use a weather machine ("not powerful enough") and where they're even sending you ("the sky") and why your map looks mostly blank ("you sure ask a lot of questions") and hang on did you just say the sky ("of course, where do you think snow comes from") when you realize that the Elves are already loading you into a trebuchet ("please hold still, we need to strap you in").
+
+As they're making the final adjustments, they discover that their calibration document (your puzzle input) has been amended by a very young Elf who was apparently just excited to show off her art skills. Consequently, the Elves are having trouble reading the values on the document.
+
+The newly-improved calibration document consists of lines of text; each line originally contained a specific calibration value that the Elves now need to recover. On each line, the calibration value can be found by combining the first digit and the last digit (in that order) to form a single two-digit number.
+
+For example:
+
+```
+1abc2
+pqr3stu8vwx
+a1b2c3d4e5f
+treb7uchet
+```
+
+In this example, the calibration values of these four lines are `12`, `38`, `15`, and `77`. Adding these together produces `142`.
+
+Consider your entire calibration document. What is the sum of all of the calibration values?
+
+<!-- livebook:{"break_markdown":true} -->
+
+We can solve this multiple ways, but I'm going to use a regular expression to filter out non-digits from each line, extract only the first and last values and then convert it to integers.
+
+From the example `treb7uchet` only has 1 number, so I'll add a case to repeat that number before parsing.
+
+Finally, after each line is processed, it will just run through `Enum.sum/2` to get the final result.
+
+```elixir
+defmodule AdventOfCode.Day1.Part1 do
+  def parse_input(input) do
+    input
+    |> String.split("\n")
+  end
+
+  def process(input) do
+    input
+    |> parse_input()
+    |> Enum.map(&process_line/1)
+    |> Enum.sum()
+  end
+
+  def process_line(line) do
+    numbers =
+      String.replace(line, ~r/\D/, "")
+      |> String.graphemes()
+
+    "#{List.first(numbers)}#{List.last(numbers)}"
+    |> String.to_integer()
+  end
+end
+```
+
+Now that we've gotten our logic in place, we need to fetch the input and perform the calculation.
+
+There is a published [Kino](https://hex.pm/packages/kino) package for [interacting with Advent of Code](https://hex.pm/packages/kino_aoc) that I'll use to fetch the input.
+
+<!-- livebook:{"attrs":{"assign_to":"day1","day":"1","session_secret":"AOC_COOKIE","year":"2023"},"chunks":null,"kind":"Elixir.KinoAOC.HelperCell","livebook_object":"smart_cell"} -->
+
+```elixir
+{:ok, day1} = KinoAOC.download_puzzle("2023", "1", System.fetch_env!("LB_AOC_COOKIE"))
+```
+
+```elixir
+values = AdventOfCode.Day1.Part1.parse_input(day1)
+
+frame = Kino.Frame.new()
+
+table =
+  Kino.DataTable.new(%{
+    "Items" => values,
+    "Values" => Enum.map(values, &AdventOfCode.Day1.Part1.process_line/1)
+  })
+
+Kino.Frame.render(frame, table)
+
+frame
+```
+
+Great, we now have the input for today. Let's run it and perform the calculation.
+
+```elixir
+AdventOfCode.Day1.Part1.process(day1)
+```
+
+### Part 2
+
+Your calculation isn't quite right. It looks like some of the digits are actually spelled out with letters: `one`, `two`, `three`, `four`, `five`, `six`, `seven`, `eight`, and `nine` also count as valid "digits".
+
+Equipped with this new information, you now need to find the real first and last digit on each line. For example:
+
+```
+two1nine
+eightwothree
+abcone2threexyz
+xtwone3four
+4nineeightseven2
+zoneight234
+7pqrstsixteen
+```
+
+In this example, the calibration values are `29`, `83`, `13`, `24`, `42`, `14`, and `76`. Adding these together produces `281`.
+
+What is the sum of all of the calibration values?
+
+<!-- livebook:{"break_markdown":true} -->
+
+Ok, this will be a bit dirty, but there isn't really a better way of doing this other than manual replacement for each line. So we'll replace string number labels with actual numbers in the string, and then re-run the same process as part 1.
+
+It also seems that order is important. ~~`eightwothree` should evaluate to `8wo3` when converting words to digits.~~ Sometimes there might be number strings with overlapping digits, so `oneight` should translate to `18`, so `eightwothree` should evaluate to `823`, not `8wo3`.
+
+```elixir
+defmodule AdventOfCode.Day1.Part2 do
+  def process(input) do
+    input
+    |> AdventOfCode.Day1.Part1.parse_input()
+    |> Enum.map(&process_line/1)
+    |> Enum.sum()
+  end
+
+  def process_line(line) do
+    line
+    |> AdventOfCode.Day1.Part2.parse_line()
+    |> AdventOfCode.Day1.Part1.process_line()
+  end
+
+  def parse_line(line) do
+    Regex.scan(~r/(?=(\d|one|two|three|four|five|six|seven|eight|nine))/, line)
+    |> List.flatten()
+    |> Enum.map_join("", &AdventOfCode.Day1.Part2.label_to_number/1)
+  end
+
+  def label_to_number("one"), do: "1"
+  def label_to_number("two"), do: "2"
+  def label_to_number("three"), do: "3"
+  def label_to_number("four"), do: "4"
+  def label_to_number("five"), do: "5"
+  def label_to_number("six"), do: "6"
+  def label_to_number("seven"), do: "7"
+  def label_to_number("eight"), do: "8"
+  def label_to_number("nine"), do: "9"
+  def label_to_number(label), do: label
+end
+```
+
+```elixir
+values = AdventOfCode.Day1.Part1.parse_input(day1)
+
+frame = Kino.Frame.new()
+
+table =
+  Kino.DataTable.new(%{
+    "Items" => values,
+    "Values" => Enum.map(values, &AdventOfCode.Day1.Part2.process_line/1)
+  })
+
+Kino.Frame.render(frame, table)
+
+frame
+```
+
+```elixir
+AdventOfCode.Day1.Part2.process(day1)
+```
+
+<!-- livebook:{"offset":6272,"stamp":{"token":"XCP.921YSiAS8beLkKurxPNnG_Gyw8vXIlmpgZZmE6Z8DikviVE7cKQg_Tlf8gHahxeNs3546i0jeHdwlItF7wyfsoDisdhOpBzwMnipCR1EB1MlMERu-Q","version":2}} -->
