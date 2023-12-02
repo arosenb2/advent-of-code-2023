@@ -9,15 +9,17 @@ Mix.install([
 require Logger
 ```
 
-## Day 1: Trebuchet?!
-
-### Part 1
+## The Problem
 
 Something is wrong with global snow production, and you've been selected to take a look. The Elves have even given you a map; on it, they've used stars to mark the top fifty locations that are likely to be having problems.
 
 You've been doing this long enough to know that to restore snow operations, you need to check all fifty stars by December 25th.
 
 Collect stars by solving puzzles. Two puzzles will be made available on each day in the Advent calendar; the second puzzle is unlocked when you complete the first. Each puzzle grants one star. Good luck!
+
+## Day 1: Trebuchet?!
+
+### Part 1
 
 You try to ask why they can't just use a weather machine ("not powerful enough") and where they're even sending you ("the sky") and why your map looks mostly blank ("you sure ask a lot of questions") and hang on did you just say the sky ("of course, where do you think snow comes from") when you realize that the Elves are already loading you into a trebuchet ("please hold still, we need to strap you in").
 
@@ -183,4 +185,274 @@ frame
 AdventOfCode.Day1.Part2.process(day1)
 ```
 
-<!-- livebook:{"offset":6272,"stamp":{"token":"XCP.921YSiAS8beLkKurxPNnG_Gyw8vXIlmpgZZmE6Z8DikviVE7cKQg_Tlf8gHahxeNs3546i0jeHdwlItF7wyfsoDisdhOpBzwMnipCR1EB1MlMERu-Q","version":2}} -->
+## Day 2: Cube Conundrum
+
+### Part 1
+
+You're launched high into the atmosphere! The apex of your trajectory just barely reaches the surface of a large island floating in the sky. You gently land in a fluffy pile of leaves. It's quite cold, but you don't see much snow. An Elf runs over to greet you.
+
+The Elf explains that you've arrived at **Snow Island** and apologizes for the lack of snow. He'll be happy to explain the situation, but it's a bit of a walk, so you have some time. They don't get many visitors up here; would you like to play a game in the meantime?
+
+As you walk, the Elf shows you a small bag and some cubes which are either red, green, or blue. Each time you play this game, he will hide a secret number of cubes of each color in the bag, and your goal is to figure out information about the number of cubes.
+
+To get information, once a bag has been loaded with cubes, the Elf will reach into the bag, grab a handful of random cubes, show them to you, and then put them back in the bag. He'll do this a few times per game.
+
+You play several games and record the information from each game (your puzzle input). Each game is listed with its ID number (like the `11` in `Game 11: ...`) followed by a semicolon-separated list of subsets of cubes that were revealed from the bag (like `3 red`, `5 green`, `4 blue`).
+
+For example, the record of a few games might look like this:
+
+```
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+```
+
+In game 1, three sets of cubes are revealed from the bag (and then put back again). The first set is 3 blue cubes and 4 red cubes; the second set is 1 red cube, 2 green cubes, and 6 blue cubes; the third set is only 2 green cubes.
+
+The Elf would first like to know which games would have been possible if the bag contained **only 12 red cubes, 13 green cubes, and 14 blue cubes**?
+
+In the example above, games 1, 2, and 5 would have been **possible** if the bag had been loaded with that configuration. However, game 3 would have been **impossible** because at one point the Elf showed you 20 red cubes at once; similarly, game 4 would also have been **impossible** because the Elf showed you 15 blue cubes at once. If you add up the IDs of the games that would have been possible, you get 8.
+
+Determine which games would have been possible if the bag had been loaded with only 12 red cubes, 13 green cubes, and 14 blue cubes. **What is the sum of the IDs of those games?**
+
+<!-- livebook:{"break_markdown":true} -->
+
+Alright, so for each round in a game, we have to compare the numbers against our pre-determined constraints for the different colors (12 for red, 13 for green, 14 for blue). I'll assign each color as a key in a map and then split the game results into each round. Then, if any of the round have a color that exceed the maximum, that whole game is disqualified.
+
+```elixir
+defmodule AdventOfCode.Day2.Part1 do
+  @limits %{
+    "red" => 12,
+    "green" => 13,
+    "blue" => 14
+  }
+
+  def parse_input(input) do
+    input
+    |> String.trim("\n")
+    |> String.split("\n")
+  end
+
+  def process(input) do
+    input
+    |> parse_input()
+    |> Enum.map(&parse_game/1)
+    |> Enum.map(&process_game/1)
+    |> Enum.sum()
+  end
+
+  def parse_game(game) do
+    ["Game " <> id, rest] = String.split(game, ": ", trim: true)
+
+    turns =
+      String.split(rest, "; ")
+      |> Enum.map(fn set ->
+        String.split(set, ", ")
+        |> Enum.into(%{}, fn turn ->
+          [count, color] = String.split(turn, " ")
+          {color, String.to_integer(count)}
+        end)
+      end)
+
+    {String.to_integer(id), turns}
+  end
+
+  def process_game({id, _turns} = game) do
+    if is_game_possible?(game) do
+      id
+    else
+      0
+    end
+  end
+
+  def is_turn_impossible?(turn) do
+    blue = Map.get(turn, "blue", 0)
+    red = Map.get(turn, "red", 0)
+    green = Map.get(turn, "green", 0)
+
+    blue > Map.get(@limits, "blue") || red > Map.get(@limits, "red") ||
+      green > Map.get(@limits, "green")
+  end
+
+  def is_game_possible?({_id, turns}) do
+    not Enum.any?(turns, &is_turn_impossible?/1)
+  end
+end
+```
+
+Let's test against the sample data to see if our solution works.
+
+```elixir
+input = """
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+"""
+
+input
+|> AdventOfCode.Day2.Part1.process()
+```
+
+Let's now load the actual data set and calculate the answer.
+
+<!-- livebook:{"attrs":{"assign_to":"day2","day":"2","session_secret":"AOC_COOKIE","year":"2023"},"chunks":null,"kind":"Elixir.KinoAOC.HelperCell","livebook_object":"smart_cell"} -->
+
+```elixir
+{:ok, day2} = KinoAOC.download_puzzle("2023", "2", System.fetch_env!("LB_AOC_COOKIE"))
+```
+
+```elixir
+values = AdventOfCode.Day2.Part1.parse_input(day2)
+
+frame = Kino.Frame.new()
+
+parsed_games =
+  Enum.map(values, fn game ->
+    AdventOfCode.Day2.Part1.parse_game(game)
+  end)
+
+results =
+  table =
+  Kino.DataTable.new(%{
+    "Game" => Enum.map(parsed_games, fn {label, _} -> label end),
+    "Possible?" => Enum.map(parsed_games, &AdventOfCode.Day2.Part1.is_game_possible?/1)
+  })
+
+Kino.Frame.render(frame, table)
+
+frame
+```
+
+```elixir
+AdventOfCode.Day2.Part1.process(day2)
+```
+
+### Part 2
+
+The Elf says they've stopped producing snow because they aren't getting any water! He isn't sure why the **water** stopped; however, he can show you how to get to the water source to check it out for yourself. It's just up ahead!
+
+As you continue your walk, the Elf poses a second question: in each game you played, what is the **fewest number of cubes of each color** that could have been in the bag to make the game possible?
+
+Again consider the example games from earlier:
+
+```
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+```
+
+In game 1, the game could have been played with as few as 4 red, 2 green, and 6 blue cubes. If any color had even one fewer cube, the game would have been impossible.
+Game 2 could have been played with a minimum of 1 red, 3 green, and 4 blue cubes.
+Game 3 must have been played with at least 20 red, 13 green, and 6 blue cubes.
+Game 4 required at least 14 red, 3 green, and 15 blue cubes.
+Game 5 needed no fewer than 6 red, 3 green, and 2 blue cubes in the bag.
+
+The **power** of a set of cubes is equal to the numbers of red, green, and blue cubes multiplied together. The power of the minimum set of cubes in game 1 is 48. In games 2-5 it was 12, 1560, 630, and 36, respectively. Adding up these five powers produces the sum 2286.
+
+For each game, find the minimum set of cubes that must have been present. **What is the sum of the power of these sets?**
+
+<!-- livebook:{"break_markdown":true} -->
+
+This seems to be very similar, but for each we need to grab the lowest value for each color in each set, then multiply all of those together and sum the total. Additionally, we don't need to filter out any _impossible_ games.
+
+```elixir
+defmodule AdventOfCode.Day2.Part2 do
+  def parse_input(input) do
+    input
+    |> String.trim("\n")
+    |> String.split("\n")
+  end
+
+  def process(input) do
+    input
+    |> parse_input()
+    |> Enum.map(&AdventOfCode.Day2.Part1.parse_game/1)
+    |> Enum.map(&process_game/1)
+    |> Enum.map(&calculate/1)
+    |> Enum.sum()
+  end
+
+  # def parse_game(game) do
+  #   ["Game " <> id, rest] = String.split(game, ": ", trim: true)
+
+  #   turns =
+  #     String.split(rest, "; ")
+  #     |> Enum.map(fn set ->
+  #       String.split(set, ", ")
+  #       |> Enum.into(%{}, fn turn ->
+  #         [count, color] = String.split(turn, " ")
+  #         {color, String.to_integer(count)}
+  #       end)
+  #     end)
+
+  #   {String.to_integer(id), turns}
+  # end
+
+  def process_game({_id, turns}) do
+    Enum.reduce(turns, %{"blue" => 0, "red" => 0, "green" => 0}, fn turn, acc ->
+      blue = max(Map.get(acc, "blue"), Map.get(turn, "blue", 0))
+      green = max(Map.get(acc, "green"), Map.get(turn, "green", 0))
+      red = max(Map.get(acc, "red"), Map.get(turn, "red", 0))
+
+      %{"blue" => blue, "green" => green, "red" => red}
+    end)
+  end
+
+  def calculate(values) do
+    Map.values(values)
+    |> Enum.reduce(fn value, acc -> value * acc end)
+  end
+end
+```
+
+```elixir
+values = AdventOfCode.Day2.Part2.parse_input(day2)
+
+frame = Kino.Frame.new()
+
+parsed_games =
+  Enum.map(values, fn game ->
+    AdventOfCode.Day2.Part1.parse_game(game)
+  end)
+
+results =
+  table =
+  Kino.DataTable.new(%{
+    "Game" => Enum.map(parsed_games, fn {label, _} -> label end),
+    "Calculation" =>
+      Enum.map(parsed_games, fn game ->
+        AdventOfCode.Day2.Part2.process_game(game)
+        |> AdventOfCode.Day2.Part2.calculate()
+      end)
+  })
+
+Kino.Frame.render(frame, table)
+
+frame
+```
+
+We'll now validate against the test data and then prepare to submit.
+
+```elixir
+input = """
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+"""
+
+AdventOfCode.Day2.Part2.process(input)
+```
+
+```elixir
+AdventOfCode.Day2.Part2.process(day2)
+```
+
+<!-- livebook:{"offset":16169,"stamp":{"token":"XCP.bPqNq7THYLx3N1uJJOvFPVoPEqKLWm7On7isyJifPPZKJLr5yBL4w5yiMcZwXlE3KyiOQuyve-lFMbL7gIXAXxVO_Z8Ltl11Bc9wDx1uCjlS63uGtw","version":2}} -->
